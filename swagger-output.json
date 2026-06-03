@@ -6,7 +6,7 @@
     "version": "1.0.0"
   },
   "host": "ev-fleet-backend-9yab.onrender.com",
-  "basePath": "/",
+  "basePath": "/fleet",
   "schemes": [
     "https"
   ],
