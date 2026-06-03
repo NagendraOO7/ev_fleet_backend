@@ -46,7 +46,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // GET /fleet/alerts/active
-rrouter.get('/alerts/active', async (req, res) => {
+router.get('/alerts/active', async (req, res) => {
     try {
         const anomalies = await Telemetry.aggregate([
             {
