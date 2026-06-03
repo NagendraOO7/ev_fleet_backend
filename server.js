@@ -13,7 +13,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   cors({
     origin: [
-      "http://localhost:3001",
+      "https://ev-fleet-backend-9yab.onrender.com$",
     ],
   })
 );
