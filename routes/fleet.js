@@ -46,28 +46,33 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // GET /fleet/alerts/active
-router.get('/alerts/active', async (req, res) => {
+rrouter.get('/alerts/active', async (req, res) => {
     try {
-        // Find anomalies from the latest data points of all vehicles
         const anomalies = await Telemetry.aggregate([
-            { $sort: { vehicle_id: 1, timestamp: -1 } },
-            { $group: { _id: "$vehicle_id", latest: { $first: "$$ROOT" } } },
-            { $match: {
-                $or: [
-                    { "latest.battery_temp_c": { $gt: 45 } },
-                    { "latest.speed_kph": { $gt: 130 } },
-                    { "latest.soc_pct": { $lt: 10 } }
-                ]
-            }}
+            {
+                $setWindowFields: {
+                    partitionBy: "$vehicle_id",
+                    sortBy: { timestamp: -1 },
+                    output: { rank: { $rank: {} } }
+                }
+            },
+            { $match: { rank: 1 } },  // latest per vehicle
+            {
+                $match: {
+                    $or: [
+                        { battery_temp_c: { $gt: 45 } },  // ← direct fields now
+                        { speed_kph: { $gt: 130 } },
+                        { soc_pct: { $lt: 10 } }
+                    ]
+                }
+            }
         ]).exec();
 
-        // Format alerts
         const alerts = anomalies.flatMap(a => {
-            const l = a.latest;
             const res = [];
-            if (l.battery_temp_c > 45) res.push({ vehicle_id: a._id, type: 'HIGH_TEMP', severity: l.battery_temp_c > 50 ? 'critical' : 'warning', message: `Temp at ${l.battery_temp_c}°C`, value: l.battery_temp_c });
-            if (l.speed_kph > 130) res.push({ vehicle_id: a._id, type: 'EXCESSIVE_SPEED', severity: 'critical', message: `Speed at ${l.speed_kph} kph`, value: l.speed_kph });
-            if (l.soc_pct < 10) res.push({ vehicle_id: a._id, type: 'LOW_SOC', severity: 'warning', message: `SOC critically low at ${l.soc_pct}%`, value: l.soc_pct });
+            if (a.battery_temp_c > 45) res.push({ vehicle_id: a.vehicle_id, type: 'HIGH_TEMP', severity: a.battery_temp_c > 50 ? 'critical' : 'warning', message: `Temp at ${a.battery_temp_c}°C`, value: a.battery_temp_c });
+            if (a.speed_kph > 130) res.push({ vehicle_id: a.vehicle_id, type: 'EXCESSIVE_SPEED', severity: 'critical', message: `Speed at ${a.speed_kph} kph`, value: a.speed_kph });
+            if (a.soc_pct < 10) res.push({ vehicle_id: a.vehicle_id, type: 'LOW_SOC', severity: 'warning', message: `SOC critically low at ${a.soc_pct}%`, value: a.soc_pct });
             return res;
         });
 
