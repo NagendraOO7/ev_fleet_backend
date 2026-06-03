@@ -6,41 +6,90 @@ const mongoose = require('mongoose');
 // GET /vehicles (List & Search)
 router.get('/', async (req, res) => {
     try {
-        const { search, page = 1, limit = 20 } = req.query;
-        const match = search ? { $or: [{ id: new RegExp(search, 'i') }, { make: new RegExp(search, 'i') }] } : {};
+        const search = req.query.search || '';
+        const page = Number(req.query.page) || 1;
+
+        // Prevent huge requests
+        const limit = Math.min(Number(req.query.limit) || 20, 100);
+
+        const match = search
+            ? {
+                  $or: [
+                      { id: { $regex: search, $options: 'i' } },
+                      { make: { $regex: search, $options: 'i' } }
+                  ]
+              }
+            : {};
+
         const [total, vehicles] = await Promise.all([
-    Vehicle.countDocuments(match),
-    Vehicle.find(match)
-        .select('id make model status')
-        .skip((page - 1) * limit)
-        .limit(Number(limit))
-        .lean()
-]);
+            Vehicle.countDocuments(match),
+            Vehicle.find(match)
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .lean()
+        ]);
 
-const ids = vehicles.map(v => v.id);
+        const vehicleIds = vehicles.map(v => v.id);
 
-const latestData = await Telemetry.find({
-    vehicle_id: { $in: ids }
-}).lean();
+        let telemetryMap = {};
 
-const telemetryMap = Object.fromEntries(
-    latestData.map(t => [t.vehicle_id, t])
-);
+        if (vehicleIds.length) {
+            const latestTelemetry = await Telemetry.aggregate([
+                {
+                    $match: {
+                        vehicle_id: { $in: vehicleIds }
+                    }
+                },
+                {
+                    $sort: {
+                        vehicle_id: 1,
+                        timestamp: -1
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$vehicle_id',
+                        latest: { $first: '$$ROOT' }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        vehicle_id: '$_id',
+                        latest: 1
+                    }
+                }
+            ]);
 
-res.json({
-    data: vehicles.map(v => ({
-        ...v,
-        latest_telemetry: telemetryMap[v.id] || null
-    })),
-    pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / limit)
-    }
-});
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+            telemetryMap = Object.fromEntries(
+                latestTelemetry.map(item => [
+                    item.vehicle_id,
+                    item.latest
+                ])
+            );
+        }
+
+        const data = vehicles.map(vehicle => ({
+            ...vehicle,
+            latest_telemetry: telemetryMap[vehicle.id] || null
+        }));
+
+        res.json({
+            data,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Vehicle API Error:', error);
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
 });
 
