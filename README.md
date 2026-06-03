@@ -13,7 +13,7 @@ Node.js (v20.12+ recommended)
 MongoDB (Running locally on port 27017)
 Python 3 & pip
 1. Clone & Install Dependencies
-git clone https://github.com/YOUR_USERNAME/ev-fleet-api.gitcd ev-fleet-api# Install Backendcd backendnpm installcd ..# Install Frontendcd clientnpm installcd ..
+git clone https://github.com/NagendraOO7/ev_fleet_backend.git ev-fleet-api# Install Backendcd backendnpm installcd ..# Install Frontendcd clientnpm installcd ..
 2. Seed the Database
 Run the Python script to generate vehicles and 7 days of realistic telemetry data.
 
