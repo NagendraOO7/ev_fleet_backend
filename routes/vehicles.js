@@ -1,102 +1,3 @@
-// const router = require('express').Router();
-// const Vehicle = require('../models/Vehicle');
-// const Telemetry = require('../models/Telemetry');
-// const mongoose = require('mongoose');
-
-// // GET /vehicles (List & Search)
-// router.get('/', async (req, res) => {
-//     const { search, page = 1, limit = 20 } = req.query;
-//     const match = search ? { $or: [{ id: new RegExp(search, 'i') }, { make: new RegExp(search, 'i') }] } : {};
-//     const total = await Vehicle.countDocuments(match);
-//     const vehicles = await Vehicle.find(match).skip((page - 1) * limit).limit(parseInt(limit));
-    
-//     // Fetch latest telemetry for these vehicles
-//     const ids = vehicles.map(v => v._id);
-//     const latestData = await Telemetry.aggregate([
-//         { $match: { vehicle_id: { $in: ids } } },
-//         { $sort: { timestamp: -1 } },
-//         { $group: { _id: "$vehicle_id", latest: { $first: "$$ROOT" } } }
-//     ]).exec();
-    
-//     const telemetryMap = Object.fromEntries(latestData.map(d => [d._id.toString(), d.latest]));
-    
-//     res.json({
-//         data: vehicles.map(v => ({ ...v.toObject(), latest_telemetry: telemetryMap[v._id.toString()] || null })),
-//         pagination: { page: +page, limit: +limit, total, pages: Math.ceil(total / limit) }
-//     });
-// });
-
-// // GET /vehicles/:id/latest
-// router.get('/:id/latest', async (req, res) => {
-//     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid ID" });
-//     const vehicle = await Vehicle.findById(req.params.id);
-//     if (!vehicle) return res.status(404).json({ error: "Not found" });
-    
-//     const latest = await Telemetry.findOne({ vehicle_id: req.params.id }).sort({ timestamp: -1 });
-//     res.json({ vehicle, telemetry: latest });
-// });
-
-// // GET /vehicles/:id/telemetry
-// router.get('/:id/telemetry', async (req, res) => {
-//     const { start_time, end_time, limit = 500 } = req.query;
-//     const match = { vehicle_id: req.params.id };
-//     if (start_time || end_time) {
-//         match.timestamp = {};
-//         if (start_time) match.timestamp.$gte = new Date(start_time);
-//         if (end_time) match.timestamp.$lte = new Date(end_time);
-//     }
-//     const data = await Telemetry.find(match).sort({ timestamp: 1 }).limit(parseInt(limit));
-//     res.json({ data });
-// });
-
-// // GET /vehicles/:id/trips
-// router.get('/:id/trips', async (req, res) => {
-//     const match = { vehicle_id: req.params.id, speed_kph: { $gt: 0 } };
-//     if (req.query.start_time) match.timestamp = { ...match.timestamp, $gte: new Date(req.query.start_time) };
-//     if (req.query.end_time) match.timestamp = { ...match.timestamp, $lte: new Date(req.query.end_time) };
-
-//     const drivingRecords = await Telemetry.find(match).sort({ timestamp: 1 }).select('timestamp speed_kph location_lat location_lng').lean();
-    
-//     let trips = [];
-//     let currentTrip = null;
-//     const INTERVAL_MS = 30 * 1000; // 30s based on seed
-    
-//     for (let i = 0; i < drivingRecords.length; i++) {
-//         const r = drivingRecords[i];
-//         const prev = i > 0 ? drivingRecords[i-1] : null;
-//         const timeDiff = prev ? new Date(r.timestamp) - new Date(prev.timestamp) : 0;
-
-//         // If gap > 10 minutes, consider it a new trip
-//         if (!currentTrip || timeDiff > 10 * 60 * 1000) {
-//             if (currentTrip) trips.push(currentTrip);
-//             currentTrip = { start_time: r.timestamp, end_time: r.timestamp, points: [r], distance_km: 0, max_speed: 0 };
-//         } else {
-//             // Haversine distance calculation
-//             const toRad = d => d * Math.PI / 180;
-//             const dLat = toRad(r.location_lat - prev.location_lat);
-//             const dLon = toRad(r.location_lng - prev.location_lng);
-//             const a = Math.sin(dLat/2)**2 + Math.cos(toRad(prev.location_lat)) * Math.cos(toRad(r.location_lat)) * Math.sin(dLon/2)**2;
-//             currentTrip.distance_km += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-//             currentTrip.end_time = r.timestamp;
-//         }
-//         currentTrip.points.push(r);
-//         if (r.speed_kph > currentTrip.max_speed) currentTrip.max_speed = r.speed_kph;
-//     }
-//     if (currentTrip) trips.push(currentTrip);
-
-//     // Clean up response (remove raw points to reduce payload)
-//     const cleanTrips = trips.map(t => ({
-//         start_time: t.start_time,
-//         end_time: t.end_time,
-//         distance_km: Math.round(t.distance_km * 100) / 100,
-//         max_speed_kph: t.max_speed
-//     }));
-
-//     res.json({ total_trips: cleanTrips.length, trips: cleanTrips });
-// });
-
-// module.exports = router;
-
 const router = require('express').Router();
 const Vehicle = require('../models/Vehicle');
 const Telemetry = require('../models/Telemetry');
@@ -111,14 +12,14 @@ router.get('/', async (req, res) => {
         const vehicles = await Vehicle.find(match).skip((page - 1) * limit).limit(parseInt(limit));
         
         // Fetch latest telemetry for these vehicles
-        const ids = vehicles.map(v => v._id);
+                const ids = vehicles.map(v => v.id);  // ← "EV-00001" string
         const latestData = await Telemetry.aggregate([
-            { $match: { vehicle_id: { $in: ids } } },
+            { $match: { vehicle_id: { $in: ids } } },  // ← string matches string ✓
             { $sort: { timestamp: -1 } },
             { $group: { _id: "$vehicle_id", latest: { $first: "$$ROOT" } } }
         ]).allowDiskUse(true);
-        
-        const telemetryMap = Object.fromEntries(latestData.map(d => [d._id.toString(), d.latest]));
+
+        const telemetryMap = Object.fromEntries(latestData.map(d => [d._id, d.latest])); 
         
         res.json({
             data: vehicles.map(v => ({ ...v.toObject(), latest_telemetry: telemetryMap[v._id.toString()] || null })),
