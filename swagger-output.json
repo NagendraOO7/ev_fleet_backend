@@ -5,7 +5,7 @@
     "description": "EV Fleet Telemetry API",
     "version": "1.0.0"
   },
-  "host": "ev-fleet-backend-9yab.onrender.com", 
+  "host": "ev-fleet-backend-9yab.onrender.com",
   "basePath": "/",
   "schemes": [
     "https"
