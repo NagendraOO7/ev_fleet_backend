@@ -8,34 +8,21 @@ router.get('/', async (req, res) => {
     try {
         const { search, page = 1, limit = 20 } = req.query;
         const match = search ? { $or: [{ id: new RegExp(search, 'i') }, { make: new RegExp(search, 'i') }] } : {};
-
-        const [total, vehicles] = await Promise.all([
-            Vehicle.countDocuments(match),
-            Vehicle.find(match)
-                .select('id make model battery_capacity_kwh')
-                .skip((page - 1) * limit)
-                .limit(parseInt(limit))
-                .lean()
-        ]);
-
-        const ids = vehicles.map(v => v.id);
+        const total = await Vehicle.countDocuments(match);
+        const vehicles = await Vehicle.find(match).skip((page - 1) * limit).limit(parseInt(limit));
+        
+        // Fetch latest telemetry for these vehicles
+                const ids = vehicles.map(v => v.id);  // ← "EV-00001" string
         const latestData = await Telemetry.aggregate([
-            { $match: { vehicle_id: { $in: ids } } },
-            {
-                $setWindowFields: {
-                    partitionBy: "$vehicle_id",
-                    sortBy: { timestamp: -1 },
-                    output: { rank: { $rank: {} } }
-                }
-            },
-            { $match: { rank: 1 } },
-            { $project: { rank: 0 } }
+            { $match: { vehicle_id: { $in: ids } } },  // ← string matches string ✓
+            { $sort: { timestamp: -1 } },
+            { $group: { _id: "$vehicle_id", latest: { $first: "$$ROOT" } } }
         ]).allowDiskUse(true);
 
-        const telemetryMap = Object.fromEntries(latestData.map(d => [d.vehicle_id, d]));
-
+        const telemetryMap = Object.fromEntries(latestData.map(d => [d._id, d.latest])); 
+        
         res.json({
-            data: vehicles.map(v => ({ ...v, latest_telemetry: telemetryMap[v.id] || null })),
+            data: vehicles.map(v => ({ ...v.toObject(), latest_telemetry: telemetryMap[v._id.toString()] || null })),
             pagination: { page: +page, limit: +limit, total, pages: Math.ceil(total / limit) }
         });
     } catch (err) {
