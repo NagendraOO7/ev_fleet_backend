@@ -6,7 +6,8 @@ const compression = require('compression');
 const morgan = require('morgan');
 const path = require('path');
 const { connectDB } = require('./config/db');
-const Telemetry = require('./models/Telemetry');
+const swaggerUi = require('swagger-ui-express');
+const swaggerFile = require('./swagger-output.json');
 
 const app = express();
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -25,7 +26,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use('/telemetry', require('./routes/telemetry'));
 app.use('/vehicles', require('./routes/vehicles'));
 app.use('/fleet', require('./routes/fleet'));
-
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 // Serve React Frontend
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
