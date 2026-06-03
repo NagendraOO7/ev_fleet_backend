@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
 
 const ids = vehicles.map(v => v.id);
 
-const latestData = await VehicleLatestTelemetry.find({
+const latestData = await Telemetry.find({
     vehicle_id: { $in: ids }
 }).lean();
 
