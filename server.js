@@ -13,7 +13,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   cors({
     origin: [
-      "https://ev-fleet-backend-9yab.onrender.com$",
+      "https://extraordinary-meerkat-680624.netlify.app",
     ],
   })
 );
